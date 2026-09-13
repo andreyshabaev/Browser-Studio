@@ -1,6 +1,9 @@
 name: Tape In public uptime
 
 on:
+  push:
+    paths:
+      - '.github/workflows/tapein-public-uptime.yml'
   schedule:
     - cron: '*/5 * * * *'
   workflow_dispatch:

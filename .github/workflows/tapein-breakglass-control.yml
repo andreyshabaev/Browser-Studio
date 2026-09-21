@@ -1,0 +1,64 @@
+name: Tape In Break-Glass Control Recovery
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_build:
+        description: Current Control build, e.g. v5-534
+        required: true
+      candidate_build:
+        description: Candidate Control build, e.g. v5-536
+        required: true
+      candidate_url:
+        description: Immutable HTTPS candidate download URL
+        required: true
+      sha256:
+        description: Candidate SHA-256
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tapein-breakglass-control
+  cancel-in-progress: false
+
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    environment: tapein-breakglass
+    timeout-minutes: 10
+    steps:
+      - name: Checkout guarded installer
+        uses: actions/checkout@v4
+      - name: Validate inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ '${{ inputs.expected_build }}' =~ ^v[0-9]+-[0-9]+$ ]]
+          [[ '${{ inputs.candidate_build }}' =~ ^v[0-9]+-[0-9]+$ ]]
+          [[ '${{ inputs.sha256 }}' =~ ^[0-9a-f]{64}$ ]]
+          [[ '${{ inputs.candidate_url }}' == https://* ]]
+      - name: Configure pinned SSH host
+        shell: bash
+        env:
+          HOST_KEY: ${{ secrets.TAPEIN_BREAKGLASS_HOST_KEY }}
+          SSH_KEY: ${{ secrets.TAPEIN_BREAKGLASS_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -d -m 0700 ~/.ssh
+          printf '%s\n' "$HOST_KEY" > ~/.ssh/known_hosts
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 0600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+      - name: Guarded Control recovery
+        shell: bash
+        env:
+          HOST: ${{ secrets.TAPEIN_BREAKGLASS_HOST }}
+          USER: ${{ secrets.TAPEIN_BREAKGLASS_USER }}
+        run: |
+          set -euo pipefail
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$USER@$HOST" -- \
+            '${{ inputs.expected_build }}' \
+            '${{ inputs.candidate_url }}' \
+            '${{ inputs.sha256 }}' \
+            '${{ inputs.candidate_build }}'

@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+U=https://raw.githubusercontent.com/andreyshabaev/Browser-Studio/15e7bbfa81229a314246c322d3190e8f059b2a56/recovery/install_control_v5536_unified.py
+E=80f70f0e2b482d938efe3154f03a22340e38608fbf422ada76e2ed7549d891c0
+T=$(mktemp)
+trap 'rm -f "$T"' EXIT
+curl -fsSL "$U" -o "$T"
+A=$(/usr/bin/python3 -c 'import hashlib,sys;print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$T")
+if [ "$A" != "$E" ]; then echo "RECOVERY_FAIL: installer sha mismatch: $A" >&2; exit 1; fi
+/usr/bin/python3 "$T"

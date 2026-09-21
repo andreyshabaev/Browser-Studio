@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+set -euo pipefail
+umask 077
+
+CONTROL=/usr/local/lib/tapein-control-v4/tapein_control_v4.py
+ROLLBACK_DIR=/usr/local/lib/tapein-control-v4/rollback
+
+usage(){ echo "usage: $0 <expected-build> <candidate-url> <sha256> <candidate-build>" >&2; exit 64; }
+[ "$#" = 4 ] || usage
+EXPECTED_BUILD=$1
+URL=$2
+EXPECTED_SHA=$3
+CANDIDATE_BUILD=$4
+[[ "$EXPECTED_BUILD" =~ ^v[0-9]+-[0-9]+$ ]] || usage
+[[ "$CANDIDATE_BUILD" =~ ^v[0-9]+-[0-9]+$ ]] || usage
+[[ "$EXPECTED_SHA" =~ ^[0-9a-f]{64}$ ]] || usage
+[[ "$URL" == https://* ]] || usage
+
+mkdir -p "$ROLLBACK_DIR"
+TMP=$(mktemp)
+BACKUP="$ROLLBACK_DIR/tapein_control_v4.py.${EXPECTED_BUILD}.$(date -u +%Y%m%dT%H%M%SZ)"
+cleanup(){ rm -f "$TMP"; }
+trap cleanup EXIT
+
+current_build=$(grep -m1 '^CONTROL_BUILD=' "$CONTROL" | cut -d= -f2- | tr -d "'\"[:space:]")
+[ "$current_build" = "$EXPECTED_BUILD" ] || { echo "BASE_MISMATCH:$current_build" >&2; exit 20; }
+
+curl -fL --connect-timeout 10 --max-time 180 "$URL" -o "$TMP"
+printf '%s  %s\n' "$EXPECTED_SHA" "$TMP" | sha256sum -c - >/dev/null
+candidate_build=$(grep -m1 '^CONTROL_BUILD=' "$TMP" | cut -d= -f2- | tr -d "'\"[:space:]")
+[ "$candidate_build" = "$CANDIDATE_BUILD" ] || { echo "CANDIDATE_BUILD_MISMATCH:$candidate_build" >&2; exit 21; }
+python3 -m py_compile "$TMP"
+python3 "$TMP" selftest >/dev/null
+
+cp -a "$CONTROL" "$BACKUP"
+rollback(){
+  rc=$?
+  if [ "$rc" != 0 ] && [ -f "$BACKUP" ]; then
+    install -o root -g root -m 0755 "$BACKUP" "$CONTROL" || true
+    systemctl restart tapein-control-v4.timer 2>/dev/null || true
+  fi
+  exit "$rc"
+}
+trap rollback ERR
+
+install -o root -g root -m 0755 "$TMP" "$CONTROL.new"
+mv -Tf "$CONTROL.new" "$CONTROL"
+systemctl daemon-reload
+systemctl restart tapein-control-v4.timer
+systemctl start tapein-control-v4.service
+live_build=$(grep -m1 '^CONTROL_BUILD=' "$CONTROL" | cut -d= -f2- | tr -d "'\"[:space:]")
+[ "$live_build" = "$CANDIDATE_BUILD" ] || { echo "POSTCHECK_BUILD_MISMATCH:$live_build" >&2; exit 22; }
+echo "BREAKGLASS_INSTALL_PASS build=$live_build rollback=$BACKUP"

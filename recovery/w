@@ -1,0 +1,8 @@
+#!/usr/bin/env python3
+import os,re,urllib.request
+U='https://raw.githubusercontent.com/andreyshabaev/Browser-Studio/aaf685d24ccd1f2ec871d6cb9e90c3d5dacb5488/recovery/install_control_v5536_v2.py'
+s=urllib.request.urlopen(U,timeout=30).read().decode('utf-8')
+c=os.environ['TAPEIN_CANDIDATE_URL']
+s,n=re.subn(r'^CANDIDATE_URL = .*$', 'CANDIDATE_URL = '+repr(c), s, count=1, flags=re.M)
+if n!=1: raise SystemExit('WRAPPER_FAIL:CANDIDATE_URL_LINE')
+exec(compile(s,'<tapein-v2-signed>','exec'))

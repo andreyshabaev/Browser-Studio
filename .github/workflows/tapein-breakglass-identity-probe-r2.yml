@@ -1,0 +1,47 @@
+name: Tape In Break-Glass Identity Probe R2
+
+on:
+  push:
+    branches:
+      - tapein-breakglass-recovery
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tapein-breakglass-identity-probe-r2
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    environment: tapein-breakglass
+    timeout-minutes: 5
+    steps:
+      - name: Configure pinned SSH host
+        shell: bash
+        env:
+          HOST_KEY: ${{ secrets.TAPEIN_BREAKGLASS_HOST_KEY }}
+          SSH_KEY: ${{ secrets.TAPEIN_BREAKGLASS_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$HOST_KEY"
+          test -n "$SSH_KEY"
+          install -d -m 0700 ~/.ssh
+          printf '%s\n' "$HOST_KEY" > ~/.ssh/known_hosts
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 0600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+      - name: Fail-closed Control identity precheck
+        shell: bash
+        env:
+          HOST: ${{ secrets.TAPEIN_BREAKGLASS_HOST }}
+          USER: ${{ secrets.TAPEIN_BREAKGLASS_USER }}
+        run: |
+          set -euo pipefail
+          test -n "$HOST"
+          test -n "$USER"
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$USER@$HOST" -- \
+            'v999999-999999' \
+            'https://raw.githubusercontent.com/andreyshabaev/Browser-Studio/tapein-breakglass-recovery/recovery/identity_probe_candidate_v999999.py' \
+            'f65784aa178108b2d68f9e4f2411dcf5d21a32bcae29ac17c7462d8f705f4119' \
+            'v999999-999998'

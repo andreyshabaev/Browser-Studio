@@ -1,0 +1,37 @@
+name: Tape In HTTP Blackbox 20260922
+
+on:
+  push:
+    paths:
+      - '.github/workflows/tapein-http-blackbox-20260922.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Probe release resolver and generic routes
+        shell: bash
+        run: |
+          set -euo pipefail
+          probe() {
+            name="$1"; url="$2"
+            echo "===== ${name} ====="
+            h=$(mktemp); b=$(mktemp)
+            code=$(curl -sS --max-time 20 -D "$h" -o "$b" -w '%{http_code}' -H 'Cache-Control: no-cache' -H 'User-Agent: TapeInRecoveryProbe/1.0' "$url" || true)
+            echo "HTTP_STATUS=${code}"
+            grep -E -i '^(content-type|x-studio-release|cache-control|server|date):' "$h" || true
+            echo 'BODY_BEGIN'
+            head -c 4000 "$b" || true
+            echo
+            echo 'BODY_END'
+            rm -f "$h" "$b"
+          }
+          cb=$(date +%s%N)
+          probe READY "https://tapein.ru/cloud-api/ready?cb=${cb}"
+          probe STUDIO_RELEASE "https://tapein.ru/cloud-api/internal/studio-release?cb=${cb}"
+          probe GENERIC_INDEX "https://tapein.ru/index.html?cb=${cb}"
+          probe SYSTEM_BOOTSTRAP "https://tapein.ru/agent-results/system-bootstrap.json?cb=${cb}"

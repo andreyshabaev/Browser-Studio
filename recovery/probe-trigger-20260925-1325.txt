@@ -1,0 +1,2 @@
+Tape In break-glass credential liveness probe trigger, 2026-09-25.
+No server mutation requested. This commit only triggers the existing fail-closed identity probe workflow.
